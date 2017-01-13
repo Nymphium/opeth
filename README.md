@@ -7,6 +7,10 @@ Opeth is the optimizer and debug tools for [Lua](https://lua.org) VM bytecode, o
 ## opeth
 Lua VM Bytecode optimizer
 
+### install
+```
+luarocks --local install opeth-opeth
+```
 ### usage
 
 ```
@@ -32,9 +36,18 @@ Options:
 
 ## lvis
 Lua VM Bytecode Control Flow Graph Visualizer
+### install
+```
+luarocks --local install opeth-lvis
+```
 
 ## moonstep
 Lua VM Bytecode step-by-step execution machine
+### install
+```
+luarocks --local install opeth-moonstep
+```
+
 ## commands
 ```
 command:
@@ -47,6 +60,11 @@ command:
 
 ## lasmc
 **L**ua VM Bytecode **As**se**m**bly-like Language **C**ompiler
+### install
+```
+luarocks --local install opeth-lasm
+```
+
 ### syntax
 ......
 
