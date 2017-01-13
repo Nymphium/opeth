@@ -25,15 +25,12 @@ xor = (p, q) -> (p or q) and not (p and q)
 			when LOADK, CLOSURE
 				blk = get_block nil, ins_idx, du_cfg
 
-				-- if blk.start != blk.end
 				if d_ra = this_def blk, ins_idx, RA
 					if d_ra.used == nil or #d_ra.used == 0
-						-- print ins_idx + fnblock.optdebug.modified, RA, RB
 						swapins fnblock.instruction, ins_idx, {RA, RA, 0, op: MOVE}
 						ins_idx -= 1
 						fnblock.optdebug\mod_inc!
 						du_cfg = du_chain fnblock
-						-- proc_rm fnblock, ins_idx
 						continue
 			when MOVE
 				if RA == RB

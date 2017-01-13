@@ -1,4 +1,4 @@
-#!/usr/bin/env moon
+#!/bin/env moon
 
 import read, Reader from require'opeth.bytecode.reader'
 import write, Writer from require'opeth.bytecode.writer'
