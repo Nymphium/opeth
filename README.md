@@ -130,8 +130,8 @@ Given a bytecode,
 ```
 $ lvis luac.out
 ```
-
 lvis outputs the pdf
+
 ![lvis-output](img/lvis-output.png)
 
 ## moonstep
