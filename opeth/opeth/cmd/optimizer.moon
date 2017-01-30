@@ -17,12 +17,15 @@ opt_names = {
 	}
 	{
 		name: "constant propagation"
+		description: "replace `MOVE` instruction with the another"
 	}
 	{
 		name:"dead-code elimination"
+		description: "eliminate the instructions which aren't needed"
 	}
 	{
 		name:"function inlining"
+		description: "expand a funcion call with the function's instructions"
 	}
 }
 
