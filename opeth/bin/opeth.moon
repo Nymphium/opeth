@@ -34,7 +34,7 @@ args = (=> @parse!) with argparse name, description
 			print "#{name} v#{version}\n#{description}"
 			os.exit 0
 		)
-	\flag(    "--show-optimizations",  "show a sort of otimization"
+	\flag(    "--lsit-optimizations",  "show a list of otimization"
 		)\action(->
 			for o in *optimizer.opt_names
 				print "%-26s : %s"\format o.name, o.description
