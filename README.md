@@ -92,6 +92,16 @@ change of the number of instructions: 11 -> 8
 write to optimized.out (size: 129 byte, time: 0.32711029052734 msec)
 ```
 
+### optimize functions inscripts
+you can use the optimizer in your scripts.
+```moon
+optimizer = require'opeth.opeth'
+
+f = -> ......
+f_ = optimizer f
+f_!
+```
+
 ## lvis
 Lua VM Bytecode Control Flow Graph Visualizer
 ### install
