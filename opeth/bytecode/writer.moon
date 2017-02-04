@@ -53,27 +53,27 @@ f2ieee = (flt) ->
 -- interface to write to file
 -- {{{
 class Writer
-	new: (file) =>
-		typ = type file
-		file = switch typ
-			when "userdata" then file
-			when "string" then assert io.open(file, "w+b"), "Writer.new #1: failed to open file `#{file}'"
+	new: (cont) =>
+		typ = type cont
+		cont = switch typ
+			when "userdata" then cont
+			when "string" then assert io.open(cont, "w+b"), "Writer.new #1: failed to open file `#{cont}'"
+			when "nil" then {block: "", write: ((a) => @block ..= a), flush: (=>), close: (=>), seek: (=>), read: (=>)}
 			else error "Writer.new receives only the type of string or file (got `#{typ}')"
-
-		@priv = {:file, size: 0}
+		@cont = cont
+		@size = 0
 	__shl: (v) =>
-		@priv.size += #v
-		with @ do assert @priv.file\write v
-	__len: => @priv.size
+		@size += #v
+		with @ do xpcall @cont\write, error, v
+	__len: => @size
 	close: =>
-		@priv.file\flush!
-		@priv.file\close!
-		@priv = nil
+		@cont\flush!
+		@cont\close!
 	show: =>
-		pos = @priv.file\seek "cur"
-		@priv.file\seek "set"
-		with @priv.file\read "*a"
-			@priv.file\seek "set", pos
+		pos = @cont\seek "cur"
+		@cont\seek "set"
+		with @cont\read "*a"
+			@cont\seek "set", pos
 -- }}}
 
 -- write (re) encoded data to file
@@ -208,6 +208,8 @@ write = (wt, vmformat) ->
 			}
 
 	write_fnblock wt, fnblock
+
+	wt
 -- }}}
 
 Writer.__base.write = write
