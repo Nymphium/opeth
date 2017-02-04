@@ -55,16 +55,15 @@ f2ieee = (flt) ->
 class Writer
 	new: (cont) =>
 		typ = type cont
-		cont = switch typ
+		@cont = switch typ
 			when "userdata" then cont
 			when "string" then assert io.open(cont, "w+b"), "Writer.new #1: failed to open file `#{cont}'"
 			when "nil" then {block: "", write: ((a) => @block ..= a), flush: (=>), close: (=>), seek: (=>), read: (=>)}
 			else error "Writer.new receives only the type of string or file (got `#{typ}')"
-		@cont = cont
 		@size = 0
 	__shl: (v) =>
 		@size += #v
-		with @ do xpcall @cont\write, error, v
+		with @ do @cont\write v
 	__len: => @size
 	close: =>
 		@cont\flush!
