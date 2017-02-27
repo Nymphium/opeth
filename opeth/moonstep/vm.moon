@@ -1,4 +1,3 @@
-
 unless RETURN
 	require'opeth.common.opname'
 
@@ -20,13 +19,20 @@ switchmatch = (str, t) ->
 
 	t.default! if t.default
 
+COLOR = 93
+CURRENT_COLOR = 96
+coloring = (color, str) -> "\027[#{color}m#{str}\027[0m"
+
+level_tostring = => (coloring COLOR, (table.concat ["[#{i}]=" for i in *@])) .. (coloring CURRENT_COLOR, "[$status]=> ")
+initsrc = (fnblock) -> {pc: 0, reg: {}, src: fnblock}
+
 class VMctrler
 	class VMCo
 		new: (co) => @co = coroutine.create co
 		status: => coroutine.status @co
 		resume: => coroutine.resume @co
 
-	new: (@fnblock, @filename = "(closure)", @src = {pc: 0, reg: {}, src: @fnblock}, @prompt = "[$status]> ") =>
+	new: (@fnblock, @filename = "(closure)", @src = (initsrc @fnblock), @levels = {}) =>
 		@vmco = @create_vm fnblock, @src
 		@indialogue = true
 		@bp = nil
@@ -64,7 +70,7 @@ class VMctrler
 
 		@src
 	linestatus: => @vmco\status! == "dead" and "(dead)" or toint @src.pc + 1
-	doprompt: => io.write (@prompt\gsub "%$status", @linestatus!)
+	doprompt: => io.write ((level_tostring @levels)\gsub "%$status", @linestatus!)
 	create_vm: (upreg = {}) =>
 		{:constant, :instruction, :upvalue, :prototype} = @fnblock
 		{:reg} = @src
@@ -151,9 +157,10 @@ class VMctrler
 								for r = 0, calllimit - (RA + 1)
 									nreg[r] = reg[RA + 1 + r]
 
-								runnerfn = VMctrler fn, "inner closure"
-								runnerfn.prompt = "[#{@linestatus!}]==[$status]> "
+								table.insert @levels, @src.pc
+								runnerfn = VMctrler fn, "inner closure", (initsrc fn), @levels
 								runnerfn\run!
+								table.remove @levels, #@levels
 
 								for i = 0, calllimit - (RA + 1)
 									nreg[r] = runnerfn.src.reg[i]
