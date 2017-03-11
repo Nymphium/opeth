@@ -1,13 +1,15 @@
+import Ct, Cg, Cb, C, R, Cp, P, Cc, V, Cmt, match from require'lpeg'
 import concat from table
 import char from string
-
 import zsplit, map, prerr, undecimal from require'opeth.common.utils'
 import hexdecode, hextobin, adjustdigit, bintoint, hextoint, hextochar, bintohex from undecimal
 
 string = string
 string.zsplit = zsplit
 
-insgen = (ins) ->
+CP = => C (P @)
+
+insgen = do
 	abc = (a, b, c) ->
 		unpack map (=> with r = bintoint @ do if r > 255 then return 255 - r), {a, b, c}
 	abx = (a, b, _b) ->
@@ -24,10 +26,11 @@ insgen = (ins) ->
 			if e = rawget @, v then e
 			else error "invalid op: #{math.tointeger v}"
 
-	b, c, a, i = (hextobin ins)\match "(#{"."\rep 9})(#{"."\rep 9})(#{"."\rep 8})(#{"."\rep 6})"
-	{op, fn} = oplist[(bintoint i) + 1]
+	(ins) ->
+		b, c, a, i = (hextobin ins)\match "(#{"."\rep 9})(#{"."\rep 9})(#{"."\rep 8})(#{"."\rep 6})"
+		{op, fn} = oplist[(bintoint i) + 1]
 
-	{:op, fn(a, b, c)}
+		{:op, fn(a, b, c)}
 
 -- XXX: supported little endian 64bit float only
 ieee2f = (rd) ->
@@ -36,173 +39,189 @@ ieee2f = (rd) ->
 	exponent = ((rd\byte 8) % 128) * 16 + ((rd\byte 7) // 16)
 	exponent == 0 and 0 or ((mantissa * 2 ^ -52 + 1) * ((rd\byte 8) > 127 and -1 or 1)) * (2 ^ (exponent - 1023))
 
--- Reader class
--- add common operations to string and file object
--- {{{
-class Reader
-	read = (n) =>
-		if n == "*a" then n = #@
-		@cur += n
-		local ret
+sizesgen = =>
+	t = map (=> @\byte!), @
+	{int: t[1], size_t: t[2], instruction: t[3], lua_integer: t[4], lua_number: t[5]}
 
-		ret, @val = @val\match("^(#{(".")\rep n})(.*)$")
-		ret
-	new: (file, val) =>
-		typ = type file
-		file = switch typ
-			when "userdata" then file
-			when "string" then assert io.open(file, "r"), "Reader.new #1: failed to open file `#{file}'"
-			when "nil" then nil
-			else error "Reader.new receives only the type of string or file (got `#{typ}')"
-
-		@val = val or  file\read "*a"
-		@priv = {:file, val: @val}
-		@cur = 1
-	__shr: (n) => read @, n
-	__len: => #@priv.val - @cur + 1
-	close: =>
-		@priv.file\close!
-		@priv = nil
-	seek: (s, ofs) =>
-		if s == "seek"
-			@cur = 0
-			@val = @priv.val
-		else
-			unless ofs then @cur
-			else
-				if type(ofs) != "number"
-					error "Reader\\seek #2 require number, got #{type ofs}"
-				else
-					@cur += ofs
-					@val = @priv.val\match ".*$", @cur
--- }}}
-
--- decodeer
-----{{{
-read_header = (rd) ->
-	{
-		hsig: rd >> 4
-		version: (hexdecode! (rd >> 1)\byte!)\gsub("(%d)(%d)", "%1.%2")
-		format: (rd >> 1)\byte!
-		luac_data: rd >> 6
-		size: {
-			int: (rd >> 1)\byte!
-			size_t: (rd >> 1)\byte!
-			instruction: (rd >> 1)\byte!
-			lua_integer: (rd >> 1)\byte!
-			lua_number: (rd >> 1)\byte!
+header_syntax = P {
+	V'Header' * Cp!
+	Header: V'Hsig' * V'Version' * V'Format' * V'Luac_data' * V'Sizes' * V'Endian' * V'Luac_num' / (
+			hsig,
+			version,
+			format,
+			luac_data,
+			size,
+			endian,
+			luac_num
+		) -> {
+			:hsig,
+			version: "#{version\byte! // 0x10}.#{version\byte! % 0x10}",
+			:format,
+			:luac_data,
+			size: sizesgen size\zsplit 1,
+			endian: (endian == ((char 0x00)\rep 6) .. char 0x56, 0x78) and 0 or 1,
+			:luac_num
 		}
+	,
+	Hsig: Cmt (CP 4), (_, _, capt) -> (assert (capt == '\x1bLua'), "HEADER SIGNATURE ERROR"), capt
+	Version: CP 1
+	Format: (CP 1) / => @\byte!
+	Luac_data: Cmt (CP 6), (_, _, capt) -> (assert (capt == "\x19\x93\r\n\x1a\n"), "PLATFORM CONVERSION ERROR"), capt
+	Sizes: CP 5
+	Endian: CP 8
+	Luac_num: Cmt (CP 9), (_, _, capt) -> (assert (370.5 == ieee2f capt), "IEEE754 FLOAT ERROR"), capt
+}
 
-		-- luac_int, 0x5678
-		endian: (rd >> 8) == ((char(0x00))\rep(6) .. char(0x56, 0x78)) and 0 or 1
-
-		-- luac_num, checking IEEE754 float format
-		luac_num: rd >> 9
-	}
-
-assert_header = (header) ->
-	with header
-		assert .hsig == char(0x1b, 0x4c, 0x75, 0x61), "HEADER SIGNATURE ERROR" -- header signature
-		assert .luac_data == char(0x19, 0x93, 0x0d, 0x0a, 0x1a, 0x0a), "PLATFORM CONVERSION ERROR"
-		assert 370.5 == (ieee2f .luac_num), "IEEE754 FLOAT ERROR"
-
-providetools = (rd, header) ->
-	import endian, size from header or read_header rd
+providetools = (header) ->
+	import endian, size from header
 
 	adjust_endianness = if endian < 1 then (=> @) else (xs) -> [xs[i] for i = #xs, 1, -1]
-	undumpchar = -> hexdecode! (rd >> 1)\byte!
-	undump_n = (n) -> hexdecode(n) unpack adjust_endianness {(rd >> n)\byte 1, n}
-	undumpint = -> undump_n tonumber size.int
+	undump_n = => hexdecode(#@) unpack adjust_endianness {@\byte 1, #@}
+	rawhextoint = => hextoint undump_n @
 
-	:adjust_endianness, :undump_n, :undumpchar, :undumpint
+	:adjust_endianness, :undump_n, :rawhextoint
 
-read_fnblock = (rd, header = (read_header rd), has_debug) ->
-	import adjust_endianness, undump_n, undumpchar, undumpint from providetools rd, header
+build_fnblock_syntax = (header, has_debug, top) ->
+	import size from header
+	{int: size_int, lua_integer: size_luaint, lua_number: size_luanum, instruction: size_ins} = size
+	import adjust_endianness, undump_n, rawhextoint from providetools header
+	local insnum
 
-	local instnum
+	P {
+		V'Fnblock' * Cp!
+		Fnblock: V'Chunkname' * V'Line' * V'Params' * V'Vararg' * V'Regnum' * V'Instruction' * V'Constant'* V'Upvalue' * V'Prototype' * V'Debug' / (
+				chunkname,
+				line,
+				params,
+				vararg,
+				regnum,
+				instruction,
+				constant,
+				upvalue,
+				prototype,
+				debug
+			) -> {:chunkname, :line, :params, :vararg, :regnum, :instruction, :constant, :upvalue, :prototype, :debug}
+		Chunkname: Cmt (CP 1), (entire, pos, capt) ->
+			if top
+				str = entire\sub pos, pos + (rawhextoint capt) - 2
+				has_debug = #str > 1
+				pos + #str, str
+			else
+				pos, ""
+		Line: CP(size_int) * CP(size_int) / (defined, lastdefined) -> {defined: (undump_n defined), lastdefined: (undump_n lastdefined)}
+		Params: (CP 1) / => undump_n @
+		Vararg: (CP 1) / => undump_n @
+		Regnum: (CP 1) / => undump_n @
+		Instruction: Cmt (CP size_int), (entire, pos, capt) ->
+			num =  (rawhextoint capt)
+			insnum = num
+			num *= size_int
+			inses = map (=> insgen undump_n @), (entire\sub pos, pos + num)\zsplit size_ins
+			pos + num, inses
+		Constant: Cmt (CP size_int), (entire, pos, capt) ->
+			num = rawhextoint capt
+			base_pos = pos
+			base = =>
+				base_pos += @
+				base_pos - 1
 
-	{
-		chunkname:
-			with ret = table.concat [char hextoint undumpchar! for _ = 2, hextoint undumpchar!]
-				has_debug = has_debug or #ret > 0
+			t = for _ = 1, num
+				with type: (entire\sub base_pos, base 1)\byte!
+					.val = switch .type
+						when 0x1
+							(entire\sub base_pos, base 1)\byte!
+						when 0x3
+							ieee2f (entire\sub base_pos, base size_luanum)
+						when 0x13
+							n = undump_n (entire\sub base_pos, base size_luaint)
+							if n\match"^[0-7]" then 0x10000000000000000 + hextoint n
+							else hextoint n
+						when 0x04, 0x14
+							len = rawhextoint entire\sub base_pos, base 1
+							if len == 0xff
+								len = rawhextoint entire\sub base_pos, base size_luaint
 
-		line: {
-			defined: undumpint!
-			lastdefined: undumpint!
-		}
+							len = len - 1
 
-		params: undumpchar!
-		vararg: undumpchar!
-		regnum: undumpchar! -- number of register to use
+							if len > 0
+								entire\sub base_pos, base len
+							else ""
+						else nil
+			base_pos, t
 
-		-- instructions: [num (size of int)] [instructions..]
-		-- instruction: [inst(4)]
-		instruction: do
-			-- with num: hextoint undumpint!
-			(=> [insgen undumpint! for _ = 1, @]) with num = hextoint undumpint!
-				instnum = num
+		Upvalue: Cmt (CP size_int), (entire, pos, capt) ->
+			num = rawhextoint capt
 
-		-- constants: [num (size of int)] [constants..]
-		-- constant: [type(1)] [...]
-		constant: for _ = 1, hextoint undumpint!
-			with type: (rd >> 1)\byte!
-				.val = switch .type
-					when  0x1
-						-- bool
-						undumpchar!
-					when  0x3
-						-- number
-						ieee2f rd >> header.size.lua_number
-					when 0x13
-						-- signed integer
-						n = undump_n header.size.lua_integer
-						if n\match"^[^0-7]" then 0x10000000000000000 + hextoint n
-						else hextoint n
-					when  0x4, 0x14
-						-- string
-						if s = (=> concat adjust_endianness map hextochar, (undump_n @)\zsplit 2 if @ > 0) with len = hextoint undumpchar!
-								if len == 0xff -- #str > 255
-									len = hextoint undump_n header.size.lua_integer
-								return len - 1 -- remove '\0' in internal expression
-							s
-						else ""
-					else nil
+			t = for i = 0, num - 1
+				v = pos + i * 2
+				u = adjust_endianness {(entire\sub v, v)\byte!, (entire\sub v - 1, v - 1)\byte!}
+				{reg: u[1], instack: u[2]}
+			pos + num * 2 , t
 
-		upvalue: for _ = 1, hextoint undumpint!
-			u = adjust_endianness {(hextoint undumpchar!), (hextoint undumpchar!)}
-			{reg: u[1], instack: u[2]} -- {reg, instack}, instack is whether it is in stack
+		Prototype: Cmt (CP size_int), (entire, pos, capt) ->
+			num = rawhextoint capt
+			base_pos = pos
 
-		prototype: [read_fnblock rd, header, has_debug for i = 1, hextoint undumpint!]
+			t = for _ = 1, num
+				fnblock_syntax = build_fnblock_syntax header, has_debug
+				proto, base_pos_ = fnblock_syntax\match entire\sub base_pos
+				base_pos += base_pos_ - 1
+				proto
 
-		debug: with ret = {}
-			.linenum = hextoint undumpint!
+			base_pos, t
 
-			if has_debug then .opline = [hextoint undumpint! for _ = 1, instnum]
+		-- term `Debug` captures nothing but the position
+		Debug: Cmt Cp!, (entire, _, pos) ->
+			base_pos = pos
+			base = =>
+				base_pos += @
+				base_pos - 1
 
-			.varnum = hextoint undumpint!
+			t = with {}
+				.linenum = rawhextoint entire\sub base_pos, base size_int
+				.opline = [rawhextoint (entire\sub base_pos, base size_int) for _ = 1, insnum] if has_debug
+				.varnum = rawhextoint (entire\sub base_pos, base size_int)
 
-			if has_debug then .varinfo = for _ = 1, .varnum
-				{
-					varname: concat adjust_endianness map hextochar, (undump_n (hextoint undumpchar!) - 1)\zsplit 2
-					life: {
-						begin: hextoint undumpint! -- lifespan begin
-						end: hextoint undumpint! -- lifespan end
+				if has_debug then .varinfo = for _ = 1, .varnum
+					{
+						varname: do
+							len = (rawhextoint entire\sub base_pos, base 1) - 1
+							concat adjust_endianness map hextochar, (undump_n entire\sub base_pos, base len)\zsplit 2
+						life: {
+							begin: rawhextoint entire\sub base_pos, base size_int
+							end: rawhextoint entire\sub base_pos, base size_int
+						}
 					}
-				}
 
-			.upvnum = hextoint undumpint!
+				.upvnum = rawhextoint entire\sub base_pos, base size_int
 
-			if has_debug then .upvinfo = for _ = 1, .upvnum
-				concat adjust_endianness map hextochar, (undump_n (hextoint undumpchar!) - 1)\zsplit 2
+				if has_debug then .upvinfo = for _ = 1, .upvnum
+					len = (rawhextoint entire\sub base_pos, base 1) - 1
+					concat adjust_endianness map hextochar, (undump_n entire\sub base_pos, base len)\zsplit 2
+
+			base_pos, t
 	}
--- }}}
 
-read = (reader, top = true) ->
-	header = assert_header read_header reader
-	fnblock = read_fnblock reader, header
+read = (str) ->
+	header, pos = header_syntax\match str
+	fnblock = (build_fnblock_syntax header, true, true)\match (str\sub pos)
+	{:header, :fnblock}
 
-	:header, :fnblock
+class Reader
+	new: (file) =>
+		typ = type file
 
-Reader.__base.read = read
+		@cont = switch typ
+			when "userdata" then file
+			when "string" then assert (io.open file), "Reader.new #1: failed to open file `#{file}'"
+			else error "Reader.new receives only the type of string or file (got `#{typ}')"
+	close: => @cont\close!
+	__len: =>
+		with #(@cont\read "*a")
+			@cont\seek "set"
+	read: =>
+		with read @cont\read "*a"
+			@cont\seek "set"
+
 :Reader, :read
 
