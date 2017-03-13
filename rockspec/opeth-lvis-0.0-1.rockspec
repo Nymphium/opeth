@@ -10,8 +10,7 @@ description = {
 
 dependencies = {
 	"opeth-core",
-	"graphvis"
-
+	"graphviz"
 }
 
 build = {
