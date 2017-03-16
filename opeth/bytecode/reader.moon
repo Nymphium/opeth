@@ -208,20 +208,35 @@ read = (str) ->
 	{:header, :fnblock}
 
 class Reader
-	new: (file) =>
-		typ = type file
+	new: (cont) =>
+		typ = type cont
 
+		@type = typ
 		@cont = switch typ
-			when "userdata" then file
-			when "string" then assert (io.open file), "Reader.new #1: failed to open file `#{file}'"
-			else error "Reader.new receives only the type of string or file (got `#{typ}')"
-	close: => @cont\close!
+			when "userdata" then cont
+			when "function" string.dump cont, true
+			when "string" then
+				with assert (io.open cont), "Reader.new #1: failed to open file `#{cont}'"
+					@type = "file"
+			else error "Reader.new receives only the type of string, function or file (got `#{typ}')"
+	close: =>
+		switch @type
+			when "function" then true
+			when "file" then @cont\close!
 	__len: =>
-		with #(@cont\read "*a")
-			@cont\seek "set"
+		switch @type
+			when "function" then #@cont
+			when "file"
+				with #(@cont\read "*a")
+					@cont\seek "set"
 	read: =>
-		with read @cont\read "*a"
-			@cont\seek "set"
+		read switch @type
+			when "function" then @cont
+			when "file" then
+				with @cont\read "*a"
+					@cont\seek "set"
+			else
+				error "What?! #{@type}"
 
 :Reader, :read
 

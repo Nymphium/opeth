@@ -19,6 +19,7 @@ build = {
 	modules = {},
 	install = {
 		lua = {
+			[ [[opeth.opeth.init]] ] = [[opeth/opeth/init.moon]],
 			[ [[opeth.opeth.common.du_chain]] ] = [[opeth/opeth/common/du_chain.moon]],
 			[ [[opeth.opeth.common.constant]] ] = [[opeth/opeth/common/constant.moon]],
 			[ [[opeth.opeth.common.optbl]] ] = [[opeth/opeth/common/optbl.moon]],
