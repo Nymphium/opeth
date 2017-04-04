@@ -179,6 +179,9 @@ luarocks --local install opeth-lasm
 - [lua-graphviz](https://github.com/Nymphium/lua-graphviz)
 - [inspect.lua](https://github.com/kikito/inspect.lua)
 
+# reference
+https://nymphium.github.io/pdf/opeth_report.pdf
+
 # LICENSE
 [MIT](https://opensource.org/licenses/MIT)
 
