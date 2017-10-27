@@ -36,7 +36,9 @@ printer = with  head: =>
 		with .debug
 			print mklbl"DEBUG"
 			print "#{mklbl"LOCALS"} (#{.varnum})"
-			for i = 1, .varnum do print "\t%-d\t%-s\t%-d\t%-d"\format i-1, unpack .varinfo[i]
+			for i = 1, .varnum
+				with .varinfo[i] do print "\t%-d\t%-s\t%-d\t%-d"\format i-1, .varname, .life.begin + 1, .life.end + 1
+
 			print "#{mklbl"UPVALUES"} (#{.upvnum})"
 			for i = 1, .upvnum do print "", i - 1, "#{.upvinfo[i]}", @upvalue[i].instack, @upvalue[i].reg
 
