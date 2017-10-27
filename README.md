@@ -159,6 +159,7 @@ command:
         r: run the code. if the breakpoint is set, stop at <pc>
         n: execute the next instruction
         d: dump the current register and PC
+        dp: dump the bytecode structure
         q: quit
 ```
 
