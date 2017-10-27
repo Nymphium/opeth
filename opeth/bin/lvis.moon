@@ -47,9 +47,11 @@ process_proto = (fn, dot, lprefix, idx = 1) ->
 		process_proto fn.prototype[pi], dot, lprefix .. "→clos#{idx}_#{pi}", idx + 1
 
 
-file = assert (io.open arg[1]), "Failed to open #{arg[1]}: No such file or directory"
-vmfmt = read Reader file
-file\close!
+vmfmt = do
+	rd = Reader arg[1]
+	with rd\read!
+		rd\close!
+
 dot = Graph!
 fontname = "Inconsolata Regular"
 styles = {
@@ -66,7 +68,6 @@ styles = {
 	}
 }
 
--- dot.graph.style\update styles.graph
 dot.nodes.style\update styles.nodes
 dot.edges.style\update styles.edges
 

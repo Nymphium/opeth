@@ -97,7 +97,7 @@ else
 	io.close with f = assert (io.open arg[1]), "Failed to open #{arg[1]}: No such file or directory"
 		lasmcode = f\read "*a"
 
-newbytecode = read Reader nil, string.dump (-> print"hello"), true
+newbytecode = (Reader (-> print"hello"))\read!
 
 ast = parser lasmcode
 unless ast
