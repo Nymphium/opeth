@@ -5,6 +5,7 @@ import deepcpy, isk from require'opeth.common.utils'
 optbl = require'opeth.opeth.common.optbl'
 inspect = require'inspect'
 toint = math.tointeger
+printer = require'opeth.bytecode.printer'
 
 __ENV = deepcpy _ENV
 
@@ -56,7 +57,8 @@ class VMctrler
 					if @vmco\status! == "dead"
 						print "[#{@filename}: exited program]"
 					else @vmco\resume!
-				"^d", -> print inspect @src
+				"^d%s*$", -> print inspect @src
+				"^dp%s*$", -> printer.fnblock @fnblock, @filename
 				"^q%s*$", -> @indialogue = false
 				"^%s*$", ->
 				default: ->
@@ -65,6 +67,7 @@ class VMctrler
 						"\tr: run the code. if the breakpoint is set, stop at <pc>\n",
 						"\tn: execute the next instruction\n",
 						"\td: dump the current register and PC\n",
+						"\tdp: dump the bytecode structure\n",
 						"\tq: quit\n"
 			}
 
