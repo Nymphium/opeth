@@ -18,6 +18,7 @@ build = {
       lua = {
          ["opeth.bytecode.reader"] = "opeth/bytecode/reader.moon",
          ["opeth.bytecode.writer"] = "opeth/bytecode/writer.moon",
+         ["opeth.bytecode.printer"] = "opeth/bytecode/printer.moon",
          ["opeth.common.blockrealm"] = "opeth/common/blockrealm.moon",
          ["opeth.common.oplist"] = "opeth/common/oplist.lua",
          ["opeth.common.opname"] = "opeth/common/opname.lua",
